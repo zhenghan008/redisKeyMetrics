@@ -1,14 +1,14 @@
-#redisKeySample-exporter
+# redisKeySample-exporter
   - This is a prometheus exporter to monitor the statistics of Redis keys,including the statistics of bigkey, memkey, hotkey.
   - The principle is to use the redis-cli --bigkeys --hotkeys --memkeys command line for key statistics.
-#Environment Variable Description
+# Environment Variable Description
 | REDIS_ADDR | REDIS_PASSWD | SAMPLE_TYPE |
 |:---- | :----| :---|
 | redis address  | redis password   | redis cli  --bigkeys --hotkeys --memkeys flag |
-##Note:
+## Note:
 1. REDIS_ADDR is the required when you need to monitor single-node redis. if you need to monitor redis cluster, leave the value empty.
 2. SAMPLE_TYPE has three values that you can choose: big,hot,mem.they correspond respectively to the --bigkeys, --hotkeys, and --memkeys flags of redis-cli.if you leave the value empty, default --bigkeys flag.
-#Prometheus integration example
+# Prometheus integration example
 - if you use the static configs of prometheus and monitor the single-node redis ,you can reference the examples below:
 
       - job_name: 'rediskeysample_exporter'
@@ -42,10 +42,10 @@
             target_label: namespace
 
 
-#Build a binary executable file
+# Build a binary executable file
 -  Run the build.sh file
 
         sh build.sh
 
-#Deploy to k8s
+# Deploy to k8s
 - [k8s Deployment](redisKeySample-exporter.yaml)
