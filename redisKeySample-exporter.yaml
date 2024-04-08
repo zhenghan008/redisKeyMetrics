@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rediskeysample-exporter
+  namespace: monitor
+  labels:
+    app: rediskeysample-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rediskeysample-exporter
+  template:
+    metadata:
+      labels:
+        app: rediskeysample-exporter
+    spec:
+      containers:
+        - name: rediskeysample-exporter
+          image: zhenghan008/rediskeysample-exporter:v1.0.1
+          env:
+            - name: "REDIS_ADDR"
+              value: ""
+            - name: "REDIS_PASSWD"
+              value: "123456"
+            - name: "SAMPLE_TYPE"
+              value: "mem"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "0.5"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9022
+
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+#  annotations:
+#    prometheus.io/path: /metrics    # 指标路径，默认 /metrics
+#    prometheus.io/port: "9022"   # 暴露指标的端口
+#    prometheus.io/scrape: "true"  #  开启
+  name: rediskeysample-exporter-service
+  namespace: monitor
+spec:
+  type: NodePort
+  selector:
+    app: rediskeysample-exporter
+  ports:
+    - name: http
+      port: 9022
+      targetPort: 9022
+      nodePort: 30403  # 替换为实际的 NodePort
+

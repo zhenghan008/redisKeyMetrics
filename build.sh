@@ -1,0 +1,1 @@
+go build -ldflags '-linkmode external -w -extldflags "-static"' -o ./redisKeySample
