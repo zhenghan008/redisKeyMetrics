@@ -49,3 +49,6 @@
 
 # Deploy to k8s
 - [k8s Deployment](redisKeySample-exporter.yaml)
+
+# docker:
+       docker pull zhenghan008/rediskeysample-exporter:v1.0.1
