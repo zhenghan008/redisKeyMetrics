@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	bigKeyGauge = promauto.NewGaugeVec(
+	redisKeyGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "redis_big_key",
-			Help: "This is a redis bigKey metrics",
+			Name: "redis_key_metrics",
+			Help: "This is a redis Key metrics",
 		},
 		[]string{"key_type", "key_name", "key_unit"}, // 定义非固定的label
 	)
@@ -79,7 +79,7 @@ func updateGaugeHandler(redisAddr string, passwd string, sampleType string) http
 			bigKeyResult = newBigKeyResult
 		}
 		for _, each := range bigKeyResult {
-			bigKeyGauge.With(prometheus.Labels{"key_type": each.StructureType, "key_name": strings.Replace(each.KeyName, "\"", "", -1), "key_unit": each.KeyUnit}).Set(each.KeySize)
+			redisKeyGauge.With(prometheus.Labels{"key_type": each.StructureType, "key_name": strings.Replace(each.KeyName, "\"", "", -1), "key_unit": each.KeyUnit}).Set(each.KeySize)
 			log.Println(each)
 		}
 		promhttp.Handler().ServeHTTP(w, r)
