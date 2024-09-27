@@ -14,5 +14,3 @@ RUN rm -f /etc/localtime \
 # 设置启动访问的初始位置，即工作目录，登录落脚点
 ENV MYPATH /data/soft/
 WORKDIR $MYPATH
-
-CMD ["/bin/sh", "-c", "/data/soft/redisKeySample"]

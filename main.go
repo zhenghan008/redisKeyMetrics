@@ -1,15 +1,16 @@
 package main
 
 import (
+	"flag"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
-	"os"
 	"redisKeyMetrics/parse"
 	"redisKeyMetrics/statistics"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -19,7 +20,7 @@ var (
 			Name: "redis_key_metrics",
 			Help: "This is a redis Key metrics",
 		},
-		[]string{"key_type", "key_name", "key_unit"}, // 定义非固定的label
+		[]string{"key_type", "key_name", "key_unit", "sample_type"}, // 定义非固定的label
 	)
 )
 
@@ -29,12 +30,51 @@ func handleErr(err error) {
 	}
 }
 
-func updateGaugeHandler(redisAddr string, passwd string, sampleType string) http.HandlerFunc {
+// Compare old and new content and generate metrics
+func compareAndGenMetrics(newSampleRes string, stFlags string) error {
+	var bigKeyResult []*parse.BigKeyResult
+	b := &parse.BigKeyResult{}
+	oldSampleRes, err := parse.ReadData(stFlags)
+	if err != nil {
+		return err
+	}
+	newBigKeyResult, _ := b.ParseBigKeyResult(newSampleRes, stFlags)
+	if oldSampleRes != "" {
+		oldBigKeyResult, err := b.ParseBigKeyResult(oldSampleRes, stFlags)
+		if err != nil {
+			return err
+		}
+		isDeepEqual := reflect.DeepEqual(newBigKeyResult, oldBigKeyResult)
+		if isDeepEqual == false {
+			err = statistics.ToResultFile(newSampleRes, stFlags)
+			if err != nil {
+				return err
+			}
+			bigKeyResult = newBigKeyResult
+		} else {
+			bigKeyResult = oldBigKeyResult
+		}
+
+	} else {
+		err = statistics.ToResultFile(newSampleRes, stFlags)
+		if err != nil {
+			return err
+		}
+		bigKeyResult = newBigKeyResult
+	}
+	for _, each := range bigKeyResult {
+		redisKeyGauge.With(prometheus.Labels{"key_type": each.StructureType, "key_name": strings.Replace(each.KeyName, "\"", "", -1), "key_unit": each.KeyUnit, "sample_type": each.SampleType}).Set(each.KeySize)
+		log.Println(each)
+	}
+	return nil
+
+}
+
+func updateGaugeHandler(redisAddr string, passwd string, sampleType string, isConcurrent bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var (
-			bigKeyResult []*parse.BigKeyResult
-			st           statistics.SampleType
-			target       string
+			target           string
+			newSampleResDict map[string]string
 		)
 		if redisAddr != "" {
 			target = redisAddr
@@ -43,56 +83,53 @@ func updateGaugeHandler(redisAddr string, passwd string, sampleType string) http
 		}
 		result := strings.Split(target, ":")
 		if len(result) != 2 {
+			log.Fatalln("not find the redis!redis addr is wrong!")
 			return
-
 		}
-		switch sampleType {
-		case "big":
-			st = statistics.Bigkeys
-		case "hot":
-			st = statistics.Hotkeys
-		case "mem":
-			st = statistics.Memkeys
-		default:
-			st = statistics.Bigkeys
+		stList := strings.Split(sampleType, "|")
+		if len(stList) == 0 || len(stList) > 3 {
+			log.Fatalln("the sampleType num is wrong")
+			return
 		}
-		newSampleRes, err := statistics.GetSampleResult(result[0], result[1], passwd, st)
-		handleErr(err)
-		oldSampleRes, err := parse.ReadData()
-		handleErr(err)
-		b := &parse.BigKeyResult{}
-		newBigKeyResult, _ := b.ParseBigKeyResult(1, newSampleRes)
-		if oldSampleRes != "" {
-			oldBigKeyResult, _ := b.ParseBigKeyResult(1, oldSampleRes)
-			isDeepEqual := reflect.DeepEqual(newBigKeyResult, oldBigKeyResult)
-			if isDeepEqual == false {
-				err = statistics.ToResultFile(newSampleRes)
-				handleErr(err)
-				bigKeyResult = newBigKeyResult
-			} else {
-				bigKeyResult = oldBigKeyResult
+		for _, each := range stList {
+			if each != "big" && each != "mem" && each != "hot" {
+				log.Fatalln("the sampleType only support hot mem big")
+				return
 			}
-
-		} else {
-			err = statistics.ToResultFile(newSampleRes)
-			handleErr(err)
-			bigKeyResult = newBigKeyResult
 		}
-		for _, each := range bigKeyResult {
-			redisKeyGauge.With(prometheus.Labels{"key_type": each.StructureType, "key_name": strings.Replace(each.KeyName, "\"", "", -1), "key_unit": each.KeyUnit}).Set(each.KeySize)
-			log.Println(each)
+		if isConcurrent {
+			newSampleResDict = statistics.GetSampleResultConcurrent(result[0], result[1], passwd, stList)
+		} else {
+			newSampleResDict = statistics.GetSampleResultSerial(result[0], result[1], passwd, stList)
+		}
+		log.Printf("newSampleResDict: %s", newSampleResDict)
+		if newSampleResDict != nil {
+			for _, each := range stList {
+				newSampleRes, ok := newSampleResDict[each]
+				if ok {
+					err := compareAndGenMetrics(newSampleRes, each)
+					if err != nil {
+						handleErr(err)
+						return
+					}
+				}
+
+			}
 		}
 		promhttp.Handler().ServeHTTP(w, r)
 	}
 }
 
 func main() {
-	redisPasswd := os.Getenv("REDIS_PASSWD")
-	sampleType := os.Getenv("SAMPLE_TYPE")
-	redisAddr := os.Getenv("REDIS_ADDR")
+	port := flag.Int("P", 9022, "ports exposed by the service")
+	isConcurrent := flag.Bool("c", false, "whether to enable concurrent execute command")
+	redisPasswd := flag.String("p", "", "Redis password")
+	sampleType := flag.String("s", "big", "Sample type example: big or big|hot or big|hot|mem")
+	redisAddr := flag.String("h", "", "Redis address example: 127.0.0.1:6379")
+	flag.Parse()
 	// 创建HTTP处理程序来暴露指标
-	http.HandleFunc("/metrics", updateGaugeHandler(redisAddr, redisPasswd, sampleType))
+	http.HandleFunc("/metrics", updateGaugeHandler(*redisAddr, *redisPasswd, *sampleType, *isConcurrent))
 	// 启动HTTP服务器来暴露指标
-	err := http.ListenAndServe(":9022", nil)
+	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	handleErr(err)
 }

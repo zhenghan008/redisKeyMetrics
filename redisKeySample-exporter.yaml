@@ -17,14 +17,8 @@ spec:
     spec:
       containers:
         - name: rediskeysample-exporter
-          image: zhenghan008/rediskeysample-exporter:v1.0.1
-          env:
-            - name: "REDIS_ADDR"
-              value: ""
-            - name: "REDIS_PASSWD"
-              value: "123456"
-            - name: "SAMPLE_TYPE"
-              value: "mem"
+          image: zhenghan008/rediskeysample-exporter:v1.1.0
+          command: ["/bin/sh", "-c", "/data/soft/redisKeySample -h=192.168.0.228:31987 -p=123456  -s=\"big|mem|hot\" -c=true -P=9024"]
           resources:
             requests:
               memory: "256Mi"
@@ -34,7 +28,7 @@ spec:
               cpu: "1"
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 9022
+            - containerPort: 9024
 
 
 
@@ -54,7 +48,6 @@ spec:
     app: rediskeysample-exporter
   ports:
     - name: http
-      port: 9022
-      targetPort: 9022
+      port: 9024    # ports exposed by the service
+      targetPort: 9024 # ports exposed by the service
       nodePort: 30403  # 替换为实际的 NodePort
-

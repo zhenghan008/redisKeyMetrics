@@ -22,9 +22,9 @@ func checkAndCreateFile(filePath string) error {
 				panic(err)
 			}
 		}(file)
-		fmt.Println("空文件已创建:", filePath)
+		fmt.Println("Empty file created:", filePath)
 	} else if err == nil {
-		fmt.Println("文件已存在:", filePath)
+		fmt.Println("File already exists:", filePath)
 	} else {
 		return err
 	}
@@ -32,14 +32,14 @@ func checkAndCreateFile(filePath string) error {
 }
 
 // ReadData 读取统计结果的文件
-func ReadData() (string, error) {
+func ReadData(fileName string) (string, error) {
 	// 获取当前工作目录的绝对路径
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Println(err)
 		return "", err
 	}
-	filePath := dir + "/sampleResult"
+	filePath := dir + fmt.Sprintf("/%s_sampleResult", fileName)
 	err = checkAndCreateFile(filePath)
 	if err != nil {
 		return "", err
@@ -53,20 +53,19 @@ func ReadData() (string, error) {
 }
 
 // ParseBigKeyResult 解析统计结果，结果写入BigKeyResult结构体指针列表并返回
-func (b *BigKeyResult) ParseBigKeyResult(pType int8, data string) ([]*BigKeyResult, error) {
-	// pType 为0时查找so far指标 为1时查找已经统计出的指标
+func (b *BigKeyResult) ParseBigKeyResult(data string, stFlags string) ([]*BigKeyResult, error) {
 	var bList []*BigKeyResult
 	pattern := ``
-	switch pType {
-	case 0:
-		pattern = `\w*\s*(\w*)\s*found so far\s*['](.*?)[']\s*with\s*(\d*)\s*(\w*)`
-		break
-	case 1:
+	switch stFlags {
+	case "big":
 		pattern = `\w*\s*(\w*)\s*found\s*['](.*?)[']\s*has\s*(\d*)\s*(\w*)`
 		break
-	default:
-		pattern = ``
-
+	case "mem":
+		pattern = `\w*\s*(\w*)\s*found\s*['](.*?)[']\s*has\s*(\d*)\s*(\w*)`
+		break
+	case "hot":
+		pattern = `\w*\s*\w*\s*found\s*with\s*\w*:\s*(\d*)\s*keyname:\s*["](.*?)["]`
+		break
 	}
 
 	re := regexp.MustCompile(pattern)
@@ -74,12 +73,19 @@ func (b *BigKeyResult) ParseBigKeyResult(pType int8, data string) ([]*BigKeyResu
 
 	for i := 0; i < len(matches); i++ {
 		nB := new(BigKeyResult)
-		nB.StructureType = matches[i][1]
-		nB.KeyName = matches[i][2]
-		nB.KeySize, _ = strconv.ParseFloat(matches[i][3], 64)
-		nB.KeyUnit = matches[i][4]
+		if stFlags == "big" || stFlags == "mem" {
+			nB.StructureType = matches[i][1]
+			nB.KeyName = matches[i][2]
+			nB.KeySize, _ = strconv.ParseFloat(matches[i][3], 64)
+			nB.KeyUnit = matches[i][4]
+		} else if stFlags == "hot" {
+			nB.StructureType = "counter"
+			nB.KeyName = matches[i][2]
+			nB.KeySize, _ = strconv.ParseFloat(matches[i][1], 64)
+			nB.KeyUnit = "times"
+		}
+		nB.SampleType = fmt.Sprintf("%skeys", stFlags)
 		bList = append(bList, nB)
-
 	}
 	return bList, nil
 

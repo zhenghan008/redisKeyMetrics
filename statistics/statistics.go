@@ -3,60 +3,117 @@ package statistics
 import (
 	"bytes"
 	"fmt"
+	"github.com/oklog/run"
 	"log"
 	"os"
 	"os/exec"
 )
 
-type SampleType int
-
-const (
-	Bigkeys SampleType = 0
-	Memkeys SampleType = 1
-	Hotkeys SampleType = 2
-)
-
-// GetSampleResult 执行系统命令并返回结果
-func GetSampleResult(rh string, rp string, rpd string, st SampleType) (string, error) {
-	sample_type := ""
-	switch st {
-	case Bigkeys:
-		sample_type = "--bigkeys"
-	case Hotkeys:
-		sample_type = "--hotkeys"
-	case Memkeys:
-		sample_type = "--memkeys"
-	default:
-		sample_type = ""
+// GetSampleResultConcurrent Execute system commands concurrently and return the result dictionary set
+func GetSampleResultConcurrent(rh string, rp string, rpd string, stList []string) map[string]string {
+	var g run.Group
+	result := make(map[string]string)
+	stFlags := make([]string, len(stList))
+	for i, eachFlag := range stList {
+		switch eachFlag {
+		case "big":
+			stFlags[i] = "--bigkeys"
+			continue
+		case "hot":
+			stFlags[i] = "--hotkeys"
+			continue
+		case "mem":
+			stFlags[i] = "--memkeys"
+			continue
+		}
 	}
-	os.Args = []string{"-h", rh, "-p", rp, "-a", rpd, sample_type}
+	for _, each := range stFlags {
+		eFlag := each
+		g.Add(func() error {
+			args := []string{"-h", rh, "-p", rp, "-a", rpd, eFlag}
+			cmd := exec.Command("redis-cli", args...)
+			var out bytes.Buffer
+			var stderr bytes.Buffer
+			cmd.Stdout = &out
+			cmd.Stderr = &stderr
+			log.Println("executing command:" + cmd.String())
+			err := cmd.Run()
+			if err != nil {
+				gError := fmt.Sprintf("error executing command: %v", err)
+				log.Println("error executing command:" + cmd.String())
+				log.Println(gError)
+				return fmt.Errorf(gError)
 
-	cmd := exec.Command("redis-cli", os.Args[0:]...)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+			} else {
+				result[eFlag[2:5]] = "Result: " + out.String()
+			}
+			return nil
+
+		},
+
+			func(err error) {
+				log.Println("execute cmd quite:" + eFlag[2:])
+				return
+			},
+		)
+	}
+	err := g.Run()
 	if err != nil {
-		log.Println(fmt.Sprint(err) + ": " + stderr.String())
-		//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return "", err
+		log.Printf("Error running GetSampleResultConcurrent: %v\n", err)
 	}
-	return "Result: " + out.String(), nil
-	/*fmt.Println("Result: " + out.String())*/
+	log.Printf("result: %s", result)
+	return result
 
 }
 
-// ToResultFile 将结果写入指定文件
-func ToResultFile(res string) error {
-	// 获取当前工作目录的绝对路径
+// GetSampleResultSerial Execute system commands serially and return the result dictionary set
+func GetSampleResultSerial(rh string, rp string, rpd string, stList []string) map[string]string {
+	result := make(map[string]string)
+	stFlags := make([]string, len(stList))
+	for i, eachFlag := range stList {
+		switch eachFlag {
+		case "big":
+			stFlags[i] = "--bigkeys"
+			continue
+		case "hot":
+			stFlags[i] = "--hotkeys"
+			continue
+		case "mem":
+			stFlags[i] = "--memkeys"
+			continue
+		}
+	}
+	for _, eFlag := range stFlags {
+		var out bytes.Buffer
+		var stderr bytes.Buffer
+		args := []string{"-h", rh, "-p", rp, "-a", rpd, eFlag}
+		cmd := exec.Command("redis-cli", args...)
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		log.Println("executing command:" + cmd.String())
+		if err != nil {
+			log.Println("error executing command:" + cmd.String())
+			log.Println(fmt.Sprint(err) + ": " + stderr.String())
+			return nil
+
+		} else {
+			result[eFlag[2:5]] = "Result: " + out.String()
+		}
+
+	}
+	log.Printf("result: %s", result)
+	return result
+}
+
+// ToResultFile Write the results to the specified file
+func ToResultFile(res string, fileName string) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	// 创建文件，如果文件已存在则会被截断为空
-	file, err := os.OpenFile(dir+"/sampleResult", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(dir+fmt.Sprintf("/%s_sampleResult", fileName), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -66,14 +123,12 @@ func ToResultFile(res string) error {
 			panic(err)
 		}
 	}(file)
-
-	// 写入字符串到文件
 	_, err = file.WriteString(res)
 	if err != nil {
 		return err
 	}
 
-	log.Println("写入文件成功")
+	log.Println("Write the results to file success!")
 	return nil
 
 }

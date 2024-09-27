@@ -5,4 +5,5 @@ type BigKeyResult struct {
 	KeyName       string
 	KeySize       float64
 	KeyUnit       string
+	SampleType    string
 }
