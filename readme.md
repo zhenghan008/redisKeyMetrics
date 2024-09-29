@@ -13,10 +13,27 @@
 - if you use the static configs of prometheus and monitor the single-node redis ,you can reference the examples below:
 
       - job_name: 'rediskeysample_exporter'
-        scrape_interval: 30s
+        scrape_interval: 200s
         metrics_path: "/metrics"
         static_configs:
         - targets: ["rediskeysample_exporter_svc:port"] # example
+      
+      - job_name: 'rediskeysample_targets'
+        scrape_interval: 200s
+        static_configs:
+        - targets:
+          - redis-node-0.redis:6379       # example
+          - redis-node-1.redis:6379       # example
+        metrics_path: /metrics
+        relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          replacement: rediskeysample_exporter_svc:port # example
+
+
 
 - or you can use the kubernetes_sd_configs of prometheus and monitor the redis cluster on k8s , you can reference the examples below:
 
@@ -24,6 +41,7 @@
           kubernetes_sd_configs:
           - role: pod
           metrics_path: /metrics
+          scrape_interval: 200s
           relabel_configs:
           - source_labels: [__meta_kubernetes_pod_name]
             action: keep
