@@ -124,7 +124,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (key_group,instance,key_type,sample_type) (label_replace(redis_key_metrics, \"key_group\", \"$1\", \"keyName\", \"([^:]*)[:]*.*\"))",
+          "expr": "avg by (key_group,instance,key_type,sample_type) (label_replace(redis_key_metrics{instance=~\"$instance\", sample_type=~\"$sample_type\"}, \"key_group\", \"$1\", \"key_name\", \"([^:]*)[:]*.*\"))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -234,7 +234,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by(key_group,instance,key_type,sample_type) (label_replace(rate(redis_key_metrics[24h]) * 100, \"key_group\", \"$1\", \"key_name\", \"([^:]*)[:]*.*\"))",
+          "expr": "sum by(key_group,instance,key_type,sample_type) (label_replace(rate(redis_key_metrics{instance=\"$instance\", sample_type=~\"$sample_type\"}[24h]) * 100, \"key_group\", \"$1\", \"key_name\", \"([^:]*)[:]*.*\"))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -279,7 +279,48 @@
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {},
+        "definition": "label_values(redis_key_metrics,instance)",
+        "description": "instance",
+        "hide": 0,
+        "includeAll": false,
+        "label": "instance",
+        "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "query": "label_values(redis_key_metrics,instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "definition": "label_values(redis_key_metrics,sample_type)",
+        "description": "sample_type",
+        "hide": 0,
+        "includeAll": false,
+        "label": "sample_type",
+        "multi": false,
+        "name": "sample_type",
+        "options": [],
+        "query": {
+          "query": "label_values(redis_key_metrics,sample_type)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-6h",
@@ -289,6 +330,6 @@
   "timezone": "",
   "title": "Redis MEM HOT BIG Key Statistics",
   "uid": "ef713c79-9bab-4e3e-ab09-d2476c527f60",
-  "version": 3,
+  "version": 11,
   "weekStart": ""
 }
