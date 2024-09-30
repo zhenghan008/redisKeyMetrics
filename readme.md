@@ -73,5 +73,5 @@
        docker pull zhenghan008/rediskeysample-exporter:v1.1.0
 
 # grafana dashboard
-- [JSON Model](Redis MEM HOT BIG Key Statistics-grafana-dashboard.json)
-- [grafana dashboard example](redis-key.png)
+- [JSON Model](./Redis-Key-Statistics-grafana-dashboard.json)
+![grafana dashboard example](./redis-key.png)
