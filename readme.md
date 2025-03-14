@@ -70,7 +70,7 @@
 - [k8s Deployment](redisKeySample-exporter.yaml)
 
 # docker:
-       docker pull zhenghan008/rediskeysample-exporter:v1.1.0
+       docker pull zhenghan008/rediskeysample-exporter:v1.1.1
 
 # grafana dashboard
 - [JSON Model](./Redis-Key-Statistics-grafana-dashboard.json)

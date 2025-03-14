@@ -7,11 +7,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 // GetSampleResultConcurrent Execute system commands concurrently and return the result dictionary set
 func GetSampleResultConcurrent(rh string, rp string, rpd string, stList []string) map[string]string {
 	var g run.Group
+	var resultSync sync.Map
 	result := make(map[string]string)
 	stFlags := make([]string, len(stList))
 	for i, eachFlag := range stList {
@@ -45,7 +47,8 @@ func GetSampleResultConcurrent(rh string, rp string, rpd string, stList []string
 				return fmt.Errorf(gError)
 
 			} else {
-				result[eFlag[2:5]] = "Result: " + out.String()
+				resultSync.Store(eFlag[2:5], "Result: "+out.String())
+
 			}
 			return nil
 
@@ -61,6 +64,10 @@ func GetSampleResultConcurrent(rh string, rp string, rpd string, stList []string
 	if err != nil {
 		log.Printf("Error running GetSampleResultConcurrent: %v\n", err)
 	}
+	resultSync.Range(func(key, value interface{}) bool {
+		result[key.(string)] = value.(string)
+		return true
+	})
 	log.Printf("result: %s", result)
 	return result
 
